@@ -1,0 +1,1900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sovereign Distiller · Iterative Dual-Agent Pipeline</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #080b10;
+  --bg2:    #0d1018;
+  --bg3:    #131820;
+  --bg4:    #1a2030;
+  --bg5:    #232b3a;
+  --bg6:    #2d3748;
+  --cyan:   #00f5e0;
+  --cyan2:  #00c4b4;
+  --gold:   #ffd060;
+  --gold2:  #ffb020;
+  --txt:    #f0f4ff;
+  --txt2:   #c8d0e0;
+  --txt3:   #98a8c0;
+  --red:    #ff4060;
+  --amber:  #ffaa20;
+  --green:  #20e87a;
+  --purple: #c4a0ff;
+  --blue:   #80c8ff;
+  --bdr:    rgba(0,245,224,0.15);
+  --bdr2:   rgba(0,245,224,0.35);
+  --bdr3:   rgba(255,208,96,0.35);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+
+body {
+  background:var(--bg);
+  color:var(--txt);
+  font-family:'IBM Plex Mono',monospace;
+  font-size:13px;
+  display:grid;
+  grid-template-rows:56px 1fr;
+  grid-template-columns:290px 1fr 360px;
+  height:100vh;
+}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--bg6);border-radius:2px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ══ HEADER ══ */
+header {
+  grid-column:1/-1;
+  background:var(--bg2);
+  border-bottom:2px solid var(--bdr2);
+  display:flex;
+  align-items:center;
+  padding:0 16px;
+  gap:10px;
+}
+.logo {
+  font-family:'Bebas Neue',sans-serif;
+  font-size:26px;
+  color:var(--cyan);
+  letter-spacing:.08em;
+  white-space:nowrap;
+  line-height:1;
+}
+.logo em { color:var(--gold); font-style:normal; }
+.hdr-sep{flex:1}
+
+.pipe-slot {
+  display:flex;flex-direction:column;gap:3px;
+  background:var(--bg3);border:1px solid var(--bdr);border-radius:6px;
+  padding:5px 9px;min-width:160px;
+}
+.pipe-slot-label {
+  font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--cyan);
+}
+.pipe-slot-label.gold { color:var(--gold); }
+select.pipe-sel {
+  background:transparent;border:none;color:var(--txt);
+  font-family:'IBM Plex Mono',monospace;font-size:11px;outline:none;cursor:pointer;
+  width:100%;
+}
+select.pipe-sel option { background:var(--bg3); color:var(--txt); }
+
+.pipe-arrow {
+  font-size:20px;color:var(--txt3);padding:0 4px;line-height:1;font-weight:700;
+}
+
+.ollama-wrap {
+  display:flex;flex-direction:column;gap:2px;
+}
+.ollama-label { font-size:9px;font-weight:700;letter-spacing:.15em;color:var(--txt3);text-transform:uppercase; }
+.hdr-input {
+  background:var(--bg3);border:1px solid var(--bdr);border-radius:5px;
+  padding:4px 8px;color:var(--txt);font-family:'IBM Plex Mono',monospace;
+  font-size:11px;outline:none;width:150px;
+}
+.hdr-input:focus{border-color:var(--bdr2)}
+
+.btn {
+  padding:6px 14px;border-radius:5px;border:1px solid var(--bdr2);
+  background:rgba(0,245,224,0.1);color:var(--cyan);
+  font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;
+  cursor:pointer;transition:all .15s;white-space:nowrap;letter-spacing:.04em;
+}
+.btn:hover{background:rgba(0,245,224,0.2);box-shadow:0 0 12px rgba(0,245,224,.15)}
+.btn.gold{border-color:var(--bdr3);background:rgba(255,208,96,0.12);color:var(--gold)}
+.btn.gold:hover{background:rgba(255,208,96,0.22)}
+.btn.danger{border-color:rgba(255,64,96,.35);background:rgba(255,64,96,.1);color:var(--red)}
+.btn:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+.btn.sm{padding:4px 9px;font-size:10px}
+
+.status-pill {
+  display:flex;align-items:center;gap:6px;padding:4px 11px;border-radius:20px;
+  border:1px solid var(--bdr);background:var(--bg3);font-size:11px;color:var(--txt2);white-space:nowrap;
+}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--txt3);transition:all .3s;flex-shrink:0}
+.sdot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+.sdot.ld{background:var(--amber);animation:pd 1s infinite}
+.sdot.er{background:var(--red);box-shadow:0 0 6px var(--red)}
+@keyframes pd{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* ══ LEFT PANEL ══ */
+#pLeft {
+  background:var(--bg2);border-right:2px solid var(--bdr);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.ph {
+  padding:12px 14px 10px;border-bottom:1px solid var(--bdr);
+  font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--txt);display:flex;align-items:center;justify-content:space-between;
+}
+
+#dropzone {
+  margin:10px;border:2px dashed var(--bdr2);border-radius:8px;
+  padding:20px 12px;text-align:center;color:var(--txt2);font-size:12px;
+  cursor:pointer;transition:all .2s;position:relative;
+}
+#dropzone:hover,#dropzone.over{border-color:var(--cyan);background:rgba(0,245,224,0.06);color:var(--cyan)}
+#dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+#dropzone .dz-icon{font-size:28px;display:block;margin-bottom:8px}
+#dropzone .dz-sub{font-size:10px;margin-top:5px;color:var(--txt3);font-weight:600;letter-spacing:.06em}
+
+#file-list{flex:1;overflow-y:auto;padding:6px 8px}
+.file-entry {
+  padding:9px 10px;border-radius:6px;border:1px solid transparent;
+  margin-bottom:3px;display:flex;align-items:center;gap:8px;
+  cursor:pointer;transition:all .15s;
+}
+.file-entry:hover{background:var(--bg4);border-color:var(--bdr)}
+.file-entry.active{background:rgba(0,245,224,0.08);border-color:var(--bdr2)}
+.file-entry.analyzed{border-left:3px solid var(--green)}
+.fe-icon{font-size:16px;flex-shrink:0}
+.fe-info{flex:1;min-width:0}
+.fe-name{color:var(--txt);font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fe-meta{font-size:10px;color:var(--txt3);margin-top:2px;font-weight:600}
+.fe-del{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;padding:2px 4px;border-radius:3px;opacity:0}
+.file-entry:hover .fe-del{opacity:1}
+.fe-del:hover{color:var(--red)}
+
+#stats-bar {
+  padding:12px 14px;border-top:2px solid var(--bdr);
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;
+}
+.stat-item{text-align:center;padding:6px;background:var(--bg3);border-radius:6px}
+.stat-val{font-size:20px;color:var(--cyan);font-weight:700;font-family:'Bebas Neue',sans-serif;letter-spacing:.04em}
+.stat-lbl{font-size:9px;color:var(--txt2);letter-spacing:.12em;text-transform:uppercase;font-weight:700;margin-top:1px}
+
+/* ══ CENTER ══ */
+#pCenter{display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+
+.subnav{display:flex;background:var(--bg2);border-bottom:2px solid var(--bdr)}
+.sntab {
+  padding:12px 16px;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--txt3);cursor:pointer;border-bottom:3px solid transparent;transition:all .2s;white-space:nowrap;
+}
+.sntab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.sntab:hover:not(.active){color:var(--txt2)}
+.sntab .badge {
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:18px;height:18px;border-radius:9px;padding:0 4px;
+  background:rgba(0,245,224,0.15);color:var(--cyan);font-size:9px;margin-left:5px;font-weight:700;
+}
+
+.c-panel{flex:1;overflow:hidden;display:none;flex-direction:column}
+.c-panel.active{display:flex}
+
+/* ── PIPELINE BANNER ── */
+#pipeline-banner {
+  padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--bdr);
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.pipe-step {
+  display:flex;align-items:center;gap:6px;padding:5px 10px;
+  border-radius:5px;border:1px solid var(--bdr);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s;
+}
+.pipe-step.active-step{border-color:var(--cyan);background:rgba(0,245,224,0.1);color:var(--cyan)}
+.pipe-step.done-step{border-color:var(--green);background:rgba(32,232,122,0.08);color:var(--green)}
+.pipe-step .step-num{font-size:8px;background:var(--bg5);padding:1px 4px;border-radius:3px;font-weight:700}
+.pipe-connector{color:var(--txt3);font-size:14px;font-weight:700}
+.pipe-model-tag{font-size:9px;color:var(--txt3);font-weight:700}
+.run-pipe-btn{margin-left:auto}
+
+/* Iteration loop indicator */
+.loop-indicator {
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 9px;border-radius:10px;
+  border:1px solid rgba(196,160,255,.4);background:rgba(196,160,255,.1);
+  color:var(--purple);font-size:10px;font-weight:700;
+}
+.loop-spin{animation:spin 1.2s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── EXTRACT TAB ── */
+#ev-toolbar {
+  padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--bdr);
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+}
+.filter-btn {
+  padding:4px 10px;border-radius:12px;border:1px solid var(--bdr);background:none;
+  color:var(--txt2);font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;
+  cursor:pointer;transition:all .15s;
+}
+.filter-btn:hover,.filter-btn.active{border-color:var(--bdr2);color:var(--cyan);background:rgba(0,245,224,0.1)}
+.filter-btn.fn.active{color:var(--purple);border-color:rgba(196,160,255,.4);background:rgba(196,160,255,.1)}
+.filter-btn.cl.active{color:var(--blue);border-color:rgba(128,200,255,.4);background:rgba(128,200,255,.1)}
+.filter-btn.co.active{color:var(--gold);border-color:var(--bdr3);background:rgba(255,208,96,.1)}
+.search-inp {
+  flex:1;min-width:120px;background:var(--bg3);border:1px solid var(--bdr);border-radius:5px;
+  padding:5px 10px;color:var(--txt);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;
+}
+.search-inp:focus{border-color:var(--bdr2)}
+.search-inp::placeholder{color:var(--txt3);font-weight:600}
+
+#extract-list{flex:1;overflow-y:auto;padding:8px}
+.extract-item {
+  background:var(--bg2);border:1px solid var(--bdr);border-radius:7px;
+  margin-bottom:6px;overflow:hidden;transition:border-color .15s;
+}
+.extract-item:hover{border-color:var(--bdr2)}
+.extract-item.in-lib{border-left:3px solid var(--green)}
+.extract-item.duplicate{border-left:3px solid var(--amber);opacity:.8}
+
+.ei-header {
+  display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;
+}
+.ei-kind {
+  padding:3px 8px;border-radius:10px;font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;font-weight:700;flex-shrink:0;
+}
+.ki-function{background:rgba(196,160,255,.2);color:var(--purple)}
+.ki-class{background:rgba(128,200,255,.2);color:var(--blue)}
+.ki-const{background:rgba(255,208,96,.2);color:var(--gold)}
+.ki-export{background:rgba(0,245,224,.15);color:var(--cyan2)}
+.ki-pattern{background:rgba(32,232,122,.15);color:var(--green)}
+
+.ei-name{color:var(--txt);font-size:13px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ei-file{font-size:10px;color:var(--txt2);white-space:nowrap;font-weight:600}
+.ei-lines{font-size:10px;color:var(--txt3);white-space:nowrap;font-weight:700}
+.ei-actions{display:flex;gap:4px;flex-shrink:0}
+.ei-btn {
+  padding:3px 9px;border-radius:4px;border:1px solid var(--bdr);background:none;
+  color:var(--txt2);font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;cursor:pointer;transition:all .15s;
+}
+.ei-btn:hover{border-color:var(--bdr2);color:var(--cyan)}
+.ei-btn.added{border-color:rgba(32,232,122,.4);color:var(--green);background:rgba(32,232,122,.1)}
+.ei-btn.ai{border-color:var(--bdr3);color:var(--gold)}
+.ei-btn.ai:hover{background:rgba(255,208,96,.1)}
+
+.ei-body{display:none;padding:0 12px 12px}
+.ei-body.open{display:block}
+.ei-code {
+  background:var(--bg);border:1px solid var(--bdr);border-radius:5px;
+  padding:10px;font-family:'Space Mono',monospace;font-size:10px;
+  color:var(--txt);white-space:pre;overflow-x:auto;line-height:1.6;
+  max-height:240px;overflow-y:auto;
+}
+.ei-desc{font-size:11px;color:var(--txt2);margin-top:8px;line-height:1.7;font-style:italic;font-weight:600}
+
+/* Iteration trail */
+.iter-trail {
+  margin-top:8px;display:flex;gap:5px;align-items:center;flex-wrap:wrap;
+}
+.iter-chip {
+  padding:2px 8px;border-radius:8px;font-size:9px;font-weight:700;
+  background:rgba(196,160,255,.12);color:var(--purple);border:1px solid rgba(196,160,255,.3);
+}
+.iter-chip.converged{background:rgba(32,232,122,.12);color:var(--green);border-color:rgba(32,232,122,.3)}
+.iter-delta {
+  font-size:10px;font-weight:700;
+}
+.iter-delta.pos{color:var(--green)}
+.iter-delta.neg{color:var(--red)}
+.iter-delta.zero{color:var(--txt3)}
+
+/* ── LIBRARY ── */
+#lib-toolbar{padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--bdr);display:flex;gap:8px;align-items:center}
+#lib-list{flex:1;overflow-y:auto;padding:8px}
+.lib-entry {
+  background:var(--bg2);border:1px solid var(--bdr);border-radius:7px;
+  margin-bottom:5px;display:flex;align-items:center;gap:8px;padding:10px 12px;
+  transition:border-color .15s;
+}
+.lib-entry:hover{border-color:var(--bdr2)}
+.lib-entry-name{flex:1;color:var(--txt);font-size:13px;font-weight:700}
+.lib-entry-meta{font-size:10px;color:var(--txt2);font-weight:600}
+.lib-entry-remove{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:16px;padding:2px 5px;font-weight:700}
+.lib-entry-remove:hover{color:var(--red)}
+.lib-empty{padding:40px;text-align:center;color:var(--txt2);font-size:13px;line-height:2;font-weight:600}
+
+/* ── CHAT ── */
+#chat-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+.msg{display:flex;flex-direction:column;gap:7px;animation:mi .22s ease}
+@keyframes mi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.msg-role{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--txt2);font-weight:700;display:flex;align-items:center;gap:8px}
+.msg-role.assistant{color:var(--cyan)}
+.msg-role.agent-b{color:var(--gold)}
+.msg-role.iter-msg{color:var(--purple)}
+.msg-role::after{content:'';flex:1;height:1px;background:var(--bdr)}
+.msg-body {
+  background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;
+  padding:14px 16px;line-height:1.8;font-size:13px;color:var(--txt);
+  white-space:pre-wrap;word-break:break-word;
+}
+.msg.user .msg-body{background:var(--bg3);border-color:var(--bg5)}
+.msg.agent-b-msg .msg-body{border-color:rgba(255,208,96,.3);background:rgba(255,208,96,.04)}
+.msg.iter-msg .msg-body{border-color:rgba(196,160,255,.25);background:rgba(196,160,255,.04)}
+.msg-body code{font-family:'Space Mono',monospace;font-size:11px;background:var(--bg);padding:2px 5px;border-radius:3px;color:var(--cyan)}
+.cb-wrap{background:var(--bg);border:1px solid var(--bdr);border-radius:5px;margin:10px 0;overflow:hidden}
+.cb-head{padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--bdr);font-size:10px;color:var(--txt2);font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.cb-copy{background:none;border:none;color:var(--cyan);cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;padding:2px 6px}
+.cb-copy:hover{color:var(--txt)}
+.cb-body{padding:12px;font-family:'Space Mono',monospace;font-size:10px;color:var(--txt);white-space:pre;overflow-x:auto;line-height:1.6;max-height:320px;overflow-y:auto}
+.think-ind{display:flex;align-items:center;gap:8px;color:var(--txt2);font-size:12px;font-weight:700;padding:8px 0}
+.dots span{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:bl 1.2s infinite;margin:0 2px}
+.dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+@keyframes bl{0%,80%,100%{opacity:.15}40%{opacity:1}}
+
+/* Score delta display in chat */
+.score-delta-bar {
+  display:flex;align-items:center;gap:8px;margin-top:8px;padding:6px 10px;
+  background:var(--bg);border:1px solid var(--bdr);border-radius:5px;font-size:11px;font-weight:700;
+}
+.sdb-label{color:var(--txt3)}
+.sdb-before{color:var(--txt2)}
+.sdb-arrow{color:var(--txt3)}
+.sdb-after{color:var(--green)}
+.sdb-delta{padding:2px 7px;border-radius:8px;font-size:10px}
+.sdb-delta.pos{background:rgba(32,232,122,.15);color:var(--green)}
+.sdb-delta.neg{background:rgba(255,64,96,.15);color:var(--red)}
+.sdb-delta.zero{background:var(--bg5);color:var(--txt3)}
+.sdb-converged{font-size:10px;color:var(--green);margin-left:auto}
+
+#chat-input-area{padding:12px 16px;background:var(--bg2);border-top:2px solid var(--bdr);display:flex;flex-direction:column;gap:8px}
+.context-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ctx-chip {
+  padding:3px 10px;border-radius:10px;border:1px solid var(--bdr3);
+  background:rgba(255,208,96,.12);color:var(--gold);font-size:10px;font-weight:700;
+  display:flex;align-items:center;gap:5px;
+}
+.ctx-chip button{background:none;border:none;color:var(--gold);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;font-weight:700}
+.ctx-chip button:hover{color:var(--red)}
+.chat-row{display:flex;gap:8px;align-items:flex-end}
+#chat-inp {
+  flex:1;background:var(--bg3);border:1px solid var(--bdr);border-radius:7px;
+  padding:12px 14px;color:var(--txt);font-family:'IBM Plex Mono',monospace;font-size:13px;
+  resize:none;outline:none;min-height:48px;max-height:150px;line-height:1.6;transition:border-color .2s;
+}
+#chat-inp:focus{border-color:var(--bdr2)}
+#chat-inp::placeholder{color:var(--txt3);font-weight:600}
+#send-btn {
+  background:var(--cyan);color:var(--bg);border:none;border-radius:7px;
+  padding:12px 20px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;
+  cursor:pointer;transition:all .2s;white-space:nowrap;letter-spacing:.05em;
+}
+#send-btn:hover{background:#20ffe8;box-shadow:0 0 18px rgba(0,245,224,.3)}
+#send-btn:disabled{background:var(--bg5);color:var(--txt3);cursor:not-allowed;box-shadow:none}
+.mode-btns{display:flex;gap:5px;flex-wrap:wrap}
+.mode-btn{padding:3px 10px;border-radius:10px;border:1px solid var(--bdr);background:none;color:var(--txt2);font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;cursor:pointer;transition:all .15s}
+.mode-btn:hover{border-color:var(--bdr2);color:var(--txt)}
+.mode-btn.active{border-color:var(--bdr3);color:var(--gold);background:rgba(255,208,96,.12)}
+#scroll-anchor{height:1px}
+
+/* ══ RIGHT PANEL ══ */
+#pRight{background:var(--bg2);border-left:2px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden}
+.rtabs{display:flex;border-bottom:2px solid var(--bdr)}
+.rtab{padding:12px 14px;font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--txt3);cursor:pointer;border-bottom:3px solid transparent;transition:all .2s}
+.rtab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.rtab:hover:not(.active){color:var(--txt2)}
+.rpanel{flex:1;overflow:hidden;display:none;flex-direction:column}
+.rpanel.active{display:flex}
+
+/* Agent config panel */
+#agent-config-panel{flex:1;overflow-y:auto;padding:14px}
+.ac-section{margin-bottom:18px}
+.ac-title{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--cyan);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bdr)}
+.ac-title.gold{color:var(--gold)}
+.ac-title.purple{color:var(--purple)}
+.ac-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;font-weight:600;color:var(--txt)}
+.ac-row label{min-width:90px;color:var(--txt2);font-weight:700;font-size:11px}
+.ac-input{flex:1;background:var(--bg3);border:1px solid var(--bdr);border-radius:5px;padding:5px 9px;color:var(--txt);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;outline:none}
+.ac-input:focus{border-color:var(--bdr2)}
+.ac-textarea{flex:1;background:var(--bg3);border:1px solid var(--bdr);border-radius:5px;padding:8px 10px;color:var(--txt);font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;outline:none;resize:vertical;min-height:70px;line-height:1.6}
+.ac-textarea:focus{border-color:var(--bdr2)}
+.ac-checkbox{accent-color:var(--cyan);width:16px;height:16px}
+.ac-hint{font-size:10px;color:var(--txt3);font-weight:600}
+.flow-step-list{display:flex;flex-direction:column;gap:5px}
+.flow-step {
+  background:var(--bg3);border:1px solid var(--bdr);border-radius:5px;
+  padding:8px 10px;display:flex;align-items:center;gap:8px;cursor:move;
+}
+.flow-step.enabled{border-color:rgba(32,232,122,.35)}
+.flow-step-name{flex:1;color:var(--txt);font-size:12px;font-weight:700}
+.flow-step-model{font-size:10px;color:var(--txt2);font-weight:700}
+.flow-step-toggle{background:none;border:none;cursor:pointer;font-size:14px;padding:0;font-weight:700}
+
+/* Iteration loop viz in config */
+.loop-viz {
+  background:var(--bg);border:1px dashed rgba(196,160,255,.35);border-radius:6px;
+  padding:10px 12px;margin-top:8px;font-size:11px;line-height:2;color:var(--txt2);
+}
+.loop-viz strong{color:var(--purple)}
+.loop-viz .lv-row{display:flex;align-items:center;gap:6px;padding:3px 0}
+.loop-viz .lv-agent{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700}
+.lv-a{background:rgba(0,245,224,.12);color:var(--cyan)}
+.lv-b{background:rgba(255,208,96,.12);color:var(--gold)}
+.lv-sys{background:var(--bg3);color:var(--txt3)}
+.lv-arrow{color:var(--txt3);font-size:12px}
+.lv-cond{font-size:10px;color:var(--purple);padding:2px 7px;border-radius:4px;background:rgba(196,160,255,.1);border:1px solid rgba(196,160,255,.25)}
+
+/* Code output */
+#code-out{flex:1;overflow-y:auto;padding:12px;font-family:'Space Mono',monospace;font-size:10px;line-height:1.7;color:var(--txt);white-space:pre;background:var(--bg)}
+.r-toolbar{padding:8px 10px;background:var(--bg3);border-top:1px solid var(--bdr);display:flex;gap:6px;flex-wrap:wrap}
+
+/* Iteration history panel */
+#iter-log{flex:1;overflow-y:auto;padding:8px}
+.iter-log-entry {
+  background:var(--bg3);border:1px solid var(--bdr);border-radius:6px;
+  margin-bottom:6px;overflow:hidden;
+}
+.ile-header{padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.ile-header:hover{background:var(--bg4)}
+.ile-name{flex:1;color:var(--txt);font-size:12px;font-weight:700}
+.ile-iters{font-size:10px;font-weight:700;color:var(--purple)}
+.ile-score{font-size:11px;font-weight:700}
+.ile-body{display:none;padding:0 12px 10px}
+.ile-body.open{display:block}
+.ile-iter-row{padding:6px 0;border-bottom:1px solid var(--bdr);font-size:11px;color:var(--txt2)}
+.ile-iter-row:last-child{border:none}
+.ile-critique{font-size:10px;color:var(--txt3);margin-top:3px;font-style:italic;line-height:1.5}
+.ile-empty{padding:28px;text-align:center;color:var(--txt2);font-size:12px;font-weight:600;line-height:2}
+
+/* Duplicate detector */
+#dup-list{flex:1;overflow-y:auto;padding:8px}
+.dup-group{background:var(--bg3);border:1px solid var(--bdr3);border-radius:7px;margin-bottom:8px;overflow:hidden}
+.dup-group-header{padding:10px 12px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.dup-group-header:hover{background:var(--bg4)}
+.dup-badge{padding:2px 8px;border-radius:10px;background:rgba(255,170,32,.2);color:var(--amber);font-size:10px;font-weight:700}
+.dup-group-name{color:var(--txt);font-size:12px;font-weight:700;flex:1}
+.dup-items{display:none;padding:0 12px 10px}
+.dup-items.open{display:block}
+.dup-item{padding:6px 8px;border-bottom:1px solid var(--bdr);font-size:11px;color:var(--txt2);display:flex;gap:8px;align-items:center}
+.dup-item:last-child{border-bottom:none}
+.dup-item-file{flex:1;color:var(--txt);font-weight:600}
+.dup-item-keep{padding:3px 8px;border-radius:4px;border:1px solid rgba(32,232,122,.35);background:rgba(32,232,122,.1);color:var(--green);font-size:10px;font-weight:700;cursor:pointer;font-family:'IBM Plex Mono',monospace}
+.dup-item-drop{padding:3px 8px;border-radius:4px;border:1px solid rgba(255,64,96,.35);background:rgba(255,64,96,.1);color:var(--red);font-size:10px;font-weight:700;cursor:pointer;font-family:'IBM Plex Mono',monospace}
+.dup-empty{padding:28px;text-align:center;color:var(--txt2);font-size:12px;font-weight:600;line-height:1.8}
+
+/* Export panel */
+#export-panel{flex:1;overflow-y:auto;padding:14px}
+.exp-section{margin-bottom:16px}
+.exp-title{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--cyan);margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--bdr)}
+.exp-format-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.exp-fmt-btn {
+  padding:11px 8px;border-radius:7px;border:1px solid var(--bdr);background:var(--bg3);
+  color:var(--txt);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;cursor:pointer;
+  transition:all .2s;text-align:center;
+}
+.exp-fmt-btn:hover{border-color:var(--bdr2);background:var(--bg4);color:var(--cyan)}
+.exp-fmt-btn .ef-icon{display:block;font-size:22px;margin-bottom:5px}
+.exp-fmt-btn .ef-label{font-size:9px;color:var(--txt2);display:block;margin-top:2px;font-weight:700}
+.exp-preview-area {
+  background:var(--bg);border:1px solid var(--bdr);border-radius:6px;
+  padding:10px;font-family:'Space Mono',monospace;font-size:9px;color:var(--txt2);
+  white-space:pre;overflow-x:auto;max-height:180px;overflow-y:auto;line-height:1.6;
+}
+.exp-opt-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:12px;font-weight:600;color:var(--txt)}
+.exp-opt-row input[type=text]{flex:1;background:var(--bg3);border:1px solid var(--bdr);border-radius:4px;padding:4px 9px;color:var(--txt);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;outline:none}
+
+/* Progress overlay */
+#progress-overlay{position:fixed;inset:0;background:rgba(8,11,16,.92);z-index:100;display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+#progress-overlay.active{display:flex}
+.prog-title{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--cyan);letter-spacing:.08em}
+.prog-sub{font-size:13px;font-weight:700;color:var(--txt2)}
+.prog-bar-wrap{width:360px;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden}
+.prog-bar{height:100%;background:var(--cyan);border-radius:3px;transition:width .3s}
+.prog-detail{font-size:11px;font-weight:600;color:var(--txt3);text-align:center;max-width:400px;line-height:1.7}
+.prog-agent{font-size:12px;font-weight:700;color:var(--gold);display:flex;align-items:center;gap:8px}
+.prog-iter{font-size:11px;font-weight:700;color:var(--purple)}
+
+/* Toast */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--bg4);border:2px solid var(--bdr2);border-radius:7px;padding:9px 20px;font-size:12px;font-weight:700;color:var(--txt);transition:transform .28s ease;pointer-events:none;z-index:999;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0)}
+
+/* Welcome screen */
+.welcome-cmd {
+  display:block;padding:10px 14px;background:var(--bg3);border:1px solid var(--bdr);border-radius:6px;
+  color:var(--txt);font-size:12px;font-weight:700;cursor:pointer;text-align:left;
+  font-family:'IBM Plex Mono',monospace;transition:all .15s;margin-bottom:6px;width:100%;
+}
+.welcome-cmd:hover{border-color:var(--bdr2);background:var(--bg4);color:var(--cyan)}
+.welcome-cmd .cmd-arrow{color:var(--cyan);margin-right:6px}
+</style>
+</head>
+<body>
+
+<div id="progress-overlay">
+  <div class="prog-title">Analyzing Files…</div>
+  <div class="prog-agent" id="prog-agent">⚡ Agent A: Extracting</div>
+  <div class="prog-iter" id="prog-iter"></div>
+  <div class="prog-sub" id="prog-sub">Reading source code</div>
+  <div class="prog-bar-wrap"><div class="prog-bar" id="prog-bar"></div></div>
+  <div class="prog-detail" id="prog-detail"></div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">Sovereign <em>·</em> Distiller</div>
+
+  <div class="ollama-wrap">
+    <div class="ollama-label">Endpoint</div>
+    <input id="ollama-url" class="hdr-input" value="http://localhost:11434" placeholder="http://localhost:11434">
+  </div>
+  <button class="btn sm" onclick="refreshModels()">↻ Refresh</button>
+
+  <div class="pipe-slot">
+    <div class="pipe-slot-label">⚡ Agent A — Extractor/Critic</div>
+    <select id="model-a" class="pipe-sel"></select>
+  </div>
+
+  <div class="pipe-arrow">⇄</div>
+
+  <div class="pipe-slot">
+    <div class="pipe-slot-label gold">★ Agent B — Refiner</div>
+    <select id="model-b" class="pipe-sel"></select>
+  </div>
+
+  <div class="hdr-sep"></div>
+  <button class="btn gold" onclick="runFullPipeline()" id="analyze-btn">⚡ Run Pipeline</button>
+  <div class="status-pill">
+    <div class="sdot" id="sdot"></div>
+    <span id="stxt">Connecting…</span>
+  </div>
+</header>
+
+<!-- LEFT: FILES -->
+<div id="pLeft">
+  <div class="ph">
+    Files
+    <div style="display:flex;gap:6px">
+      <button class="btn sm" onclick="clearFiles()">Clear</button>
+    </div>
+  </div>
+
+  <div id="dropzone">
+    <input type="file" id="file-input" multiple accept=".js,.ts,.jsx,.tsx,.html,.vue,.css,.py,.json,.md">
+    <span class="dz-icon">⊕</span>
+    Drop files or click to browse
+    <span class="dz-sub">.js .ts .jsx .tsx .html .py .json .md</span>
+  </div>
+
+  <div id="file-list"></div>
+
+  <div id="stats-bar">
+    <div class="stat-item"><div class="stat-val" id="stat-files">0</div><div class="stat-lbl">Files</div></div>
+    <div class="stat-item"><div class="stat-val" id="stat-funcs">0</div><div class="stat-lbl">Extracted</div></div>
+    <div class="stat-item"><div class="stat-val" id="stat-lib">0</div><div class="stat-lbl">In Library</div></div>
+    <div class="stat-item"><div class="stat-val" id="stat-dups">0</div><div class="stat-lbl">Duplicates</div></div>
+  </div>
+</div>
+
+<!-- CENTER -->
+<div id="pCenter">
+  <div class="subnav">
+    <div class="sntab active" onclick="switchCenter('extract')" id="sn-extract">Extract <span class="badge" id="badge-extract">0</span></div>
+    <div class="sntab" onclick="switchCenter('library')" id="sn-library">Library <span class="badge" id="badge-lib">0</span></div>
+    <div class="sntab" onclick="switchCenter('chat')" id="sn-chat">AI Refine</div>
+  </div>
+
+  <!-- EXTRACT TAB -->
+  <div class="c-panel active" id="cp-extract">
+    <div id="pipeline-banner" style="display:none">
+      <div class="pipe-step" id="ps-extract"><span class="step-num">1</span>Extract <span class="pipe-model-tag" id="ps-extract-model"></span></div>
+      <div class="pipe-connector">→</div>
+      <div class="pipe-step" id="ps-score"><span class="step-num">2</span>Score <span class="pipe-model-tag" id="ps-score-model"></span></div>
+      <div class="pipe-connector">→</div>
+      <div class="pipe-step" id="ps-refine"><span class="step-num">3</span>Iter. Refine <span class="pipe-model-tag" id="ps-refine-model"></span></div>
+      <div class="pipe-connector">→</div>
+      <div class="pipe-step" id="ps-dedup"><span class="step-num">4</span>Deduplicate</div>
+      <div id="pipe-loop-ind" style="display:none" class="loop-indicator"><span class="loop-spin">↻</span> <span id="pipe-loop-txt">loop</span></div>
+      <button class="btn sm run-pipe-btn" onclick="runFullPipeline()">▶ Re-run</button>
+    </div>
+
+    <div id="ev-toolbar">
+      <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn fn" data-filter="function" onclick="setFilter('function',this)">Functions</button>
+      <button class="filter-btn cl" data-filter="class" onclick="setFilter('class',this)">Classes</button>
+      <button class="filter-btn co" data-filter="const" onclick="setFilter('const',this)">Constants</button>
+      <button class="filter-btn" data-filter="pattern" onclick="setFilter('pattern',this)">Patterns</button>
+      <input class="search-inp" id="search-inp" placeholder="Search items…" oninput="filterItems()">
+      <button class="btn sm" onclick="addAllToLib()" style="margin-left:auto">+ Add All</button>
+      <button class="btn sm gold" onclick="aiScoreAll()">AI Score All</button>
+    </div>
+    <div id="extract-list">
+      <div style="padding:40px;text-align:center;color:var(--txt2);font-size:13px;line-height:2;font-weight:600">
+        Drop files in the left panel, then click<br><span style="color:var(--cyan);font-weight:700">⚡ Run Pipeline</span> to extract, score, and iteratively refine automatically.
+      </div>
+    </div>
+  </div>
+
+  <!-- LIBRARY TAB -->
+  <div class="c-panel" id="cp-library">
+    <div id="lib-toolbar">
+      <span style="color:var(--txt2);font-size:11px;font-weight:700;flex:1">Curated library of unique functions &amp; patterns</span>
+      <button class="btn sm" onclick="dedupeLib()">⚙ Deduplicate</button>
+      <button class="btn sm gold" onclick="aiRefinLib()">AI Merge &amp; Refine</button>
+    </div>
+    <div id="lib-list">
+      <div class="lib-empty">Library is empty.<br>Add items from the Extract tab.</div>
+    </div>
+  </div>
+
+  <!-- CHAT TAB -->
+  <div class="c-panel" id="cp-chat">
+    <div id="chat-messages">
+      <div id="chat-welcome" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:32px">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:52px;color:var(--cyan);opacity:.15;line-height:1">⌘</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--txt);letter-spacing:.06em">AI Refinement Console</div>
+        <div style="font-size:12px;font-weight:600;color:var(--txt2);line-height:1.9;max-width:400px">
+          Iterative critique-refine loop: Agent A scores &amp; critiques, Agent B refines, Agent A re-evaluates. Repeats until threshold or max iterations.
+        </div>
+        <div style="width:100%;max-width:420px">
+          <button class="welcome-cmd" onclick="quickChat('Analyze the library and identify which functions are truly innovative vs standard boilerplate')"><span class="cmd-arrow">→</span> Identify innovative vs boilerplate</button>
+          <button class="welcome-cmd" onclick="quickChat('Merge all duplicate or similar functions in my library into single optimal implementations')"><span class="cmd-arrow">→</span> Merge similar functions</button>
+          <button class="welcome-cmd" onclick="quickChat('Generate a clean ES module library file from all items in my library with JSDoc comments')"><span class="cmd-arrow">→</span> Generate clean ES module</button>
+          <button class="welcome-cmd" onclick="quickChat('Which files can I safely delete given what is already captured in the library?')"><span class="cmd-arrow">→</span> Safe to delete analysis</button>
+          <button class="welcome-cmd" onclick="runDualAgentChat('Analyze innovation and produce iteratively refined versions')"><span class="cmd-arrow" style="color:var(--gold)">★</span> Dual-Agent: Iterative Score + Refine</button>
+        </div>
+      </div>
+      <div id="scroll-anchor"></div>
+    </div>
+    <div id="chat-input-area">
+      <div class="context-bar" id="ctx-bar">
+        <span style="font-size:10px;font-weight:700;color:var(--txt2)">Context:</span>
+        <span id="ctx-lib-chip" class="ctx-chip" style="display:none">Library <button onclick="toggleCtx('lib')">×</button></span>
+        <span id="ctx-extract-chip" class="ctx-chip" style="display:none">Extracted <button onclick="toggleCtx('extract')">×</button></span>
+        <span id="ctx-files-chip" class="ctx-chip" style="display:none">Files <button onclick="toggleCtx('files')">×</button></span>
+        <button class="btn sm" onclick="addLibCtx()">+ Library</button>
+        <button class="btn sm" onclick="addExtractCtx()">+ Extracted</button>
+        <button class="btn sm" onclick="addFilesCtx()">+ Files</button>
+        <button class="btn sm gold" onclick="runDualAgentChat(document.getElementById('chat-inp').value||'Analyze and refine')" title="Iterative dual-agent loop">★ Dual</button>
+      </div>
+      <div class="chat-row">
+        <textarea id="chat-inp" rows="2" placeholder="Ask AI to refine, merge, rank, or generate from your code library…"></textarea>
+        <button id="send-btn" onclick="sendChat()">Send ↵</button>
+      </div>
+      <div class="mode-btns">
+        <button class="mode-btn active" id="mb-refine" onclick="setMode('refine')">Refine</button>
+        <button class="mode-btn" id="mb-build" onclick="setMode('build')">Build App</button>
+        <button class="mode-btn" id="mb-analyze" onclick="setMode('analyze')">Analyze</button>
+        <button class="mode-btn" id="mb-merge" onclick="setMode('merge')">Merge</button>
+        <span style="font-size:10px;font-weight:700;color:var(--txt3);padding:0 4px">via:</span>
+        <button class="mode-btn active" id="ag-a" onclick="setAgent('a')">Agent A</button>
+        <button class="mode-btn" id="ag-b" onclick="setAgent('b')">Agent B</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div id="pRight">
+  <div class="rtabs">
+    <div class="rtab active" onclick="switchRight('output')" id="rt-output">Output</div>
+    <div class="rtab" onclick="switchRight('agents')" id="rt-agents">Agents</div>
+    <div class="rtab" onclick="switchRight('iterlog')" id="rt-iterlog">Iter Log</div>
+    <div class="rtab" onclick="switchRight('dupes')" id="rt-dupes">Dupes</div>
+    <div class="rtab" onclick="switchRight('export')" id="rt-export">Export</div>
+  </div>
+
+  <!-- Output -->
+  <div class="rpanel active" id="rp-output">
+    <div id="code-out">// AI-generated or extracted code appears here</div>
+    <div class="r-toolbar">
+      <button class="btn sm" onclick="copyOutput()">Copy</button>
+      <button class="btn sm" onclick="downloadOutput()">↓ .js</button>
+      <button class="btn sm" onclick="addOutputToLib()">+ To Library</button>
+      <button class="btn sm gold" onclick="downloadOutput('html')">↓ .html</button>
+    </div>
+  </div>
+
+  <!-- Agent Config -->
+  <div class="rpanel" id="rp-agents">
+    <div id="agent-config-panel">
+      <div class="ac-section">
+        <div class="ac-title">⚡ Agent A — Extractor / Critic / Re-scorer</div>
+        <div class="ac-row"><label>System Role</label><textarea class="ac-textarea" id="ac-a-role">You are a senior software architect. Your job is to analyze code, extract novel patterns, assign innovation scores (1-10), write structured critiques identifying specific weaknesses, and re-score after refinement to measure improvement delta.</textarea></div>
+        <div class="ac-row"><label>Temperature</label><input class="ac-input" id="ac-a-temp" type="number" value="0.3" min="0" max="2" step="0.1"></div>
+        <div class="ac-row"><label>Max tokens</label><input class="ac-input" id="ac-a-tokens" type="number" value="4096"></div>
+        <div class="ac-row"><label>Auto-score</label><input type="checkbox" class="ac-checkbox" id="ac-a-autoscore" checked> <span class="ac-hint">Run on all extracted items</span></div>
+      </div>
+
+      <div class="ac-section">
+        <div class="ac-title gold">★ Agent B — Refiner / Generator</div>
+        <div class="ac-row"><label>System Role</label><textarea class="ac-textarea" id="ac-b-role">You are a master code craftsman. Take critique JSON from Agent A and produce clean, documented, production-ready refined implementations with full JSDoc. Address each critique point explicitly. Improve naming, error handling, and reusability.</textarea></div>
+        <div class="ac-row"><label>Temperature</label><input class="ac-input" id="ac-b-temp" type="number" value="0.65" min="0" max="2" step="0.1"></div>
+        <div class="ac-row"><label>Max tokens</label><input class="ac-input" id="ac-b-tokens" type="number" value="8192"></div>
+        <div class="ac-row"><label>Handoff</label><input type="checkbox" class="ac-checkbox" id="ac-b-handoff" checked> <span class="ac-hint">Use Agent A critique as input</span></div>
+      </div>
+
+      <div class="ac-section">
+        <div class="ac-title purple">↻ Iteration Settings</div>
+        <div class="ac-row">
+          <label>Max loops</label>
+          <input class="ac-input" id="ac-iter-count" type="number" value="2" min="1" max="5" step="1">
+          <span class="ac-hint">per item</span>
+        </div>
+        <div class="ac-row">
+          <label>Threshold</label>
+          <input class="ac-input" id="ac-threshold" type="number" value="8" min="5" max="10" step="1">
+          <span class="ac-hint">score to stop early</span>
+        </div>
+        <div class="ac-row">
+          <label>Top N items</label>
+          <input class="ac-input" id="ac-top-n" type="number" value="10" min="1" max="40" step="1">
+          <span class="ac-hint">to refine per run</span>
+        </div>
+        <div class="ac-row">
+          <label>Min score</label>
+          <input class="ac-input" id="ac-min-score" type="number" value="7" min="1" max="10" step="1">
+          <span class="ac-hint">to qualify for refine</span>
+        </div>
+        <div class="loop-viz">
+          <div class="lv-row"><span class="lv-agent lv-a">Agent A</span><span class="lv-arrow">→</span> score + critique → JSON envelope</div>
+          <div class="lv-row"><span class="lv-agent lv-b">Agent B</span><span class="lv-arrow">→</span> refine using critique</div>
+          <div class="lv-row"><span class="lv-agent lv-a">Agent A</span><span class="lv-arrow">→</span> re-score → delta</div>
+          <div class="lv-row"><span class="lv-cond">if score ≥ threshold → converged ✓</span></div>
+          <div class="lv-row"><span class="lv-cond">else → repeat up to max loops</span></div>
+        </div>
+      </div>
+
+      <div class="ac-section">
+        <div class="ac-title">Pipeline Steps</div>
+        <div class="flow-step-list" id="flow-step-list">
+          <div class="flow-step enabled" data-step="extract"><span>⚡</span><span class="flow-step-name">1. Extract Code Items</span><span class="flow-step-model">Agent A</span><button class="flow-step-toggle" onclick="toggleStep(this)">✓</button></div>
+          <div class="flow-step enabled" data-step="score"><span>★</span><span class="flow-step-name">2. AI Score Innovation</span><span class="flow-step-model">Agent A</span><button class="flow-step-toggle" onclick="toggleStep(this)">✓</button></div>
+          <div class="flow-step enabled" data-step="refine"><span>↻</span><span class="flow-step-name">3. Iterative Critique-Refine</span><span class="flow-step-model">A⇄B</span><button class="flow-step-toggle" onclick="toggleStep(this)">✓</button></div>
+          <div class="flow-step enabled" data-step="dedup"><span>♻</span><span class="flow-step-name">4. Deduplicate Library</span><span class="flow-step-model">Internal</span><button class="flow-step-toggle" onclick="toggleStep(this)">✓</button></div>
+        </div>
+      </div>
+
+      <button class="btn gold" onclick="runFullPipeline()" style="width:100%;padding:10px;font-size:13px">⚡ Run Full Pipeline</button>
+    </div>
+  </div>
+
+  <!-- Iteration Log -->
+  <div class="rpanel" id="rp-iterlog">
+    <div style="padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--bdr);display:flex;gap:8px;align-items:center">
+      <span style="flex:1;font-size:11px;font-weight:700;color:var(--txt2)">Iteration history per item</span>
+      <button class="btn sm" onclick="clearIterLog()">Clear</button>
+    </div>
+    <div id="iter-log"><div class="ile-empty">Iteration log appears here after pipeline runs with iterative refinement.</div></div>
+  </div>
+
+  <!-- Dupes -->
+  <div class="rpanel" id="rp-dupes">
+    <div style="padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--bdr);display:flex;gap:8px;align-items:center">
+      <span style="flex:1;font-size:11px;font-weight:700;color:var(--txt2)">Detected by name similarity</span>
+      <button class="btn sm" onclick="detectDupes()">↻ Scan</button>
+    </div>
+    <div id="dup-list"><div class="dup-empty">Run a scan to detect duplicate functions across files.</div></div>
+  </div>
+
+  <!-- Export -->
+  <div class="rpanel" id="rp-export">
+    <div id="export-panel">
+      <div class="exp-section">
+        <div class="exp-title">Export Library As</div>
+        <div class="exp-format-grid">
+          <button class="exp-fmt-btn" onclick="exportLib('esm')"><span class="ef-icon">📦</span>ES Module<span class="ef-label">.js with exports</span></button>
+          <button class="exp-fmt-btn" onclick="exportLib('cjs')"><span class="ef-icon">⚙️</span>CommonJS<span class="ef-label">module.exports</span></button>
+          <button class="exp-fmt-btn" onclick="exportLib('html')"><span class="ef-icon">🌐</span>HTML Script<span class="ef-label">standalone file</span></button>
+          <button class="exp-fmt-btn" onclick="exportLib('json')"><span class="ef-icon">🗂️</span>JSON Index<span class="ef-label">manifest file</span></button>
+          <button class="exp-fmt-btn" onclick="exportLib('md')"><span class="ef-icon">📋</span>Markdown Docs<span class="ef-label">function reference</span></button>
+          <button class="exp-fmt-btn" onclick="exportLib('bundle')"><span class="ef-icon">🗜️</span>IIFE Bundle<span class="ef-label">browser global</span></button>
+        </div>
+      </div>
+      <div class="exp-section">
+        <div class="exp-title">Options</div>
+        <div class="exp-opt-row"><input type="checkbox" id="opt-jsdoc" checked> <label for="opt-jsdoc">Generate JSDoc comments</label></div>
+        <div class="exp-opt-row"><input type="checkbox" id="opt-minify"> <label for="opt-minify">Minify output</label></div>
+        <div class="exp-opt-row"><input type="checkbox" id="opt-types" checked> <label for="opt-types">Include TypeScript types</label></div>
+        <div class="exp-opt-row"><label>Namespace:</label><input type="text" id="opt-ns" value="SovereignLib" placeholder="global namespace"></div>
+      </div>
+      <div class="exp-section">
+        <div class="exp-title">Preview</div>
+        <div class="exp-preview-area" id="exp-preview">// Select an export format above</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══ SYSTEM PROMPTS ═══
+const SYS_A = () => document.getElementById('ac-a-role').value ||
+  `You are a senior software architect and code analyst. Analyze code for innovation, uniqueness, and quality. Assign innovation scores 1-10 (10=unprecedented, 1=standard boilerplate). Write structured critiques identifying specific weaknesses. When producing code wrap it in fenced blocks.`;
+
+const SYS_B = () => document.getElementById('ac-b-role').value ||
+  `You are a master code craftsman and library architect. Take raw or scored code plus critique notes and produce clean, documented, production-ready refined implementations with full JSDoc comments. Address each critique point explicitly. Eliminate redundancy, improve naming, and maximize reusability. When producing code wrap it in fenced blocks.`;
+
+// ═══ STATE ═══
+let files = [], extracted = [], library = [], chatHistory = [];
+let lastOutput = '';
+let OLLAMA = 'http://localhost:11434';
+let isStreaming = false;
+let activeFilter = 'all';
+let chatMode = 'refine';
+let activeAgent = 'a';
+let ctx = { lib: false, extract: false, files: false };
+let pipelineSteps = { extract: true, score: true, refine: true, dedup: true };
+let iterationLog = []; // stores per-item iteration history
+
+// ═══ INIT ═══
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('dropzone');
+  const fi = document.getElementById('file-input');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); handleFiles(e.dataTransfer.files); });
+  fi.addEventListener('change', () => handleFiles(fi.files));
+  document.getElementById('chat-inp').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
+  document.getElementById('ollama-url').addEventListener('change', e => {
+    OLLAMA = e.target.value.replace(/\/$/, ''); refreshModels();
+  });
+  refreshModels();
+  updateStats();
+});
+
+// ═══ OLLAMA ═══
+async function refreshModels() {
+  OLLAMA = document.getElementById('ollama-url').value.replace(/\/$/, '');
+  setStatus('ld', 'Connecting…');
+  try {
+    const r = await fetch(`${OLLAMA}/api/tags`);
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    const models = d.models || [];
+    const selA = document.getElementById('model-a');
+    const selB = document.getElementById('model-b');
+    selA.innerHTML = ''; selB.innerHTML = '';
+    if (!models.length) { selA.innerHTML = selB.innerHTML = '<option>No models</option>'; setStatus('er', 'No models'); return; }
+    models.forEach(m => {
+      const mkOpt = () => { const o = document.createElement('option'); o.value = m.name; o.textContent = m.name; return o; };
+      selA.appendChild(mkOpt());
+      selB.appendChild(mkOpt());
+    });
+    const names = models.map(m => m.name);
+    const coderPref = names.find(n => /coder|deepseek|qwen.*coder/i.test(n));
+    const generalPref = names.find(n => /llama3|mistral|qwen(?!.*coder)|phi|gemma/i.test(n));
+    if (coderPref) selA.value = coderPref;
+    if (generalPref && generalPref !== coderPref) selB.value = generalPref;
+    else if (models.length > 1) selB.value = models[1].name;
+    setStatus('on', `${models.length} models`);
+    updatePipelineModelTags();
+    toast(`${models.length} models loaded`);
+  } catch { setStatus('er', 'Offline'); toast('Ollama not reachable — check endpoint'); }
+}
+
+function setStatus(s, t) {
+  document.getElementById('sdot').className = 'sdot ' + s;
+  document.getElementById('stxt').textContent = t;
+}
+
+function getModelA() { return document.getElementById('model-a').value; }
+function getModelB() { return document.getElementById('model-b').value; }
+
+function updatePipelineModelTags() {
+  const a = getModelA(), b = getModelB();
+  const shortA = a ? a.split(':')[0] : '?';
+  const shortB = b ? b.split(':')[0] : '?';
+  ['ps-extract-model','ps-score-model'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = shortA; });
+  const rm = document.getElementById('ps-refine-model');
+  if (rm) rm.textContent = `${shortA}⇄${shortB}`;
+}
+
+document.getElementById('model-a').addEventListener('change', updatePipelineModelTags);
+document.getElementById('model-b').addEventListener('change', updatePipelineModelTags);
+
+// ═══ FILE HANDLING ═══
+async function handleFiles(fileList) {
+  const newFiles = [];
+  for (const f of fileList) {
+    if (files.find(x => x.name === f.name && x.size === f.size)) continue;
+    const content = await readFile(f);
+    const ext = f.name.split('.').pop().toLowerCase();
+    newFiles.push({ id: uid(), name: f.name, size: f.size, ext, content, analyzed: false });
+  }
+  files.push(...newFiles);
+  renderFiles(); updateStats();
+  if (newFiles.length) toast(`${newFiles.length} file(s) loaded`);
+}
+
+function readFile(f) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = () => rej(new Error('Read failed'));
+    r.readAsText(f);
+  });
+}
+
+function renderFiles() {
+  const list = document.getElementById('file-list');
+  if (!files.length) { list.innerHTML = ''; return; }
+  list.innerHTML = files.map(f => `
+    <div class="file-entry ${f.analyzed ? 'analyzed' : ''}" onclick="previewFile('${f.id}')">
+      <span class="fe-icon">${fileIcon(f.ext)}</span>
+      <div class="fe-info">
+        <div class="fe-name">${escH(f.name)}</div>
+        <div class="fe-meta">${fmtBytes(f.size)} · .${f.ext}${f.analyzed ? ' · ✓ analyzed' : ''}</div>
+      </div>
+      <button class="fe-del" onclick="removeFile('${f.id}',event)">×</button>
+    </div>`).join('');
+}
+
+function removeFile(id, e) {
+  e.stopPropagation();
+  const fname = files.find(f => f.id === id)?.name;
+  extracted = extracted.filter(x => x.file !== fname);
+  files = files.filter(f => f.id !== id);
+  renderFiles(); renderExtracted(); updateStats(); toast('File removed');
+}
+
+function clearFiles() {
+  files = []; extracted = []; library = []; iterationLog = [];
+  renderFiles(); renderExtracted(); renderLibrary(); updateStats(); renderDupes([]); renderIterLog();
+}
+
+function previewFile(id) {
+  const f = files.find(x => x.id === id);
+  if (!f) return;
+  lastOutput = f.content;
+  document.getElementById('code-out').textContent = f.content;
+  switchRight('output');
+  toast(`Viewing: ${f.name}`);
+}
+
+// ═══ FULL PIPELINE ═══
+async function runFullPipeline() {
+  if (!files.length) { toast('Load files first'); return; }
+  const modelA = getModelA(), modelB = getModelB();
+  if (!modelA) { toast('Select a model for Agent A'); return; }
+
+  const btn = document.getElementById('analyze-btn');
+  btn.disabled = true;
+  showProgress();
+
+  const maxIterations = parseInt(document.getElementById('ac-iter-count').value) || 2;
+  const threshold = parseInt(document.getElementById('ac-threshold').value) || 8;
+  const topN = parseInt(document.getElementById('ac-top-n').value) || 10;
+  const minScore = parseInt(document.getElementById('ac-min-score').value) || 7;
+
+  // STEP 1: Extract
+  if (pipelineSteps.extract) {
+    setPipeStep('extract', 'active');
+    setProgress(0, 'Step 1/4: Extracting code items', `Parsing ${files.length} file(s)`, '⚡ Agent A: Extracting', '');
+    let newItems = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      setProgress(i / files.length * 0.20, `Parsing ${f.name}`, `File ${i + 1} of ${files.length}`, '⚡ Agent A: Extracting', '');
+      newItems.push(...parseFile(f));
+      f.analyzed = true;
+      await sleep(10);
+    }
+    const seen = new Set(extracted.map(e => e.name + '|' + e.file));
+    extracted.push(...newItems.filter(x => !seen.has(x.name + '|' + x.file)));
+    setPipeStep('extract', 'done');
+    renderFiles();
+  }
+
+  // STEP 2: AI Score (Agent A)
+  if (pipelineSteps.score && modelA && extracted.length > 0) {
+    setPipeStep('score', 'active');
+    const toScore = extracted.filter(x => x.innovation === null).slice(0, 40);
+    if (toScore.length > 0) {
+      setProgress(0.20, `Step 2/4: AI Scoring ${toScore.length} items`, `Agent A (${modelA.split(':')[0]}) analyzing…`, '⚡ Agent A: Scoring', '');
+      await aiScoreItems(toScore, modelA);
+    }
+    setPipeStep('score', 'done');
+    setProgress(0.40, 'Step 2/4: Scoring complete', '', '⚡ Agent A: Done', '');
+  }
+
+  // STEP 3: Iterative Critique-Refine (Agent A ⇄ Agent B)
+  if (pipelineSteps.refine && modelB && extracted.length > 0) {
+    setPipeStep('refine', 'active');
+    showLoopIndicator(true);
+
+    const topItems = extracted
+      .filter(x => x.innovation >= minScore)
+      .sort((a, b) => (b.innovation || 0) - (a.innovation || 0))
+      .slice(0, topN);
+
+    if (topItems.length > 0) {
+      setProgress(0.40, `Step 3/4: Iterative refinement of ${topItems.length} items`, `Max ${maxIterations} loops, threshold ${threshold}/10`, '⚡ Agent A ⇄ ★ Agent B', '');
+      await aiIterativeRefineItems(topItems, modelA, modelB, maxIterations, threshold, (item, iter, totalIters) => {
+        const pct = 0.40 + 0.45 * (topItems.indexOf(item) / topItems.length) + (0.45 / topItems.length) * (iter / totalIters);
+        setProgress(pct,
+          `Refining: ${item.name}`,
+          `Item ${topItems.indexOf(item)+1}/${topItems.length}`,
+          iter % 2 === 0 ? `⚡ Agent A: Critiquing (iter ${iter+1})` : `★ Agent B: Refining (iter ${iter+1})`,
+          `Loop ${iter+1} / ${maxIterations}`
+        );
+      });
+    } else {
+      setProgress(0.85, 'Step 3/4: No items met minimum score threshold', `Raise items to ≥${minScore} first`, '★ Agent B: Skipping', '');
+    }
+
+    showLoopIndicator(false);
+    setPipeStep('refine', 'done');
+    setProgress(0.85, 'Step 3/4: Iterative refinement complete', '', '★ Agent B: Done', '');
+  }
+
+  // STEP 4: Deduplicate
+  if (pipelineSteps.dedup) {
+    setPipeStep('dedup', 'active');
+    setProgress(0.92, 'Step 4/4: Deduplicating', '', 'Internal: Dedup', '');
+    await sleep(200);
+    const dups = detectDupes();
+    setPipeStep('dedup', 'done');
+    setProgress(1, 'Pipeline complete!', `${extracted.length} items · ${iterationLog.length} refined · ${dups.length} dup groups`, '✓ Done', '');
+    await sleep(600);
+  }
+
+  hideProgress();
+  btn.disabled = false;
+  renderExtracted();
+  renderLibrary();
+  renderIterLog();
+  updateStats();
+  switchCenter('extract');
+  document.getElementById('pipeline-banner').style.display = 'flex';
+  toast(`Pipeline complete — ${extracted.length} items, ${iterationLog.length} iteratively refined`);
+}
+
+// ═══ ITERATIVE CRITIQUE-REFINE ═══
+async function aiIterativeRefineItems(items, modelA, modelB, maxIterations, threshold, progressCb) {
+  for (const item of items) {
+    const logEntry = { id: item.id, name: item.name, file: item.file, iters: [] };
+    let currentCode = item.code;
+    let currentScore = item.innovation ?? 5;
+    let converged = false;
+
+    for (let iter = 0; iter < maxIterations; iter++) {
+      if (progressCb) progressCb(item, iter * 2, maxIterations * 2);
+
+      // ── Agent A: Critique pass ──
+      const critiquePrompt = `You are reviewing this ${item.kind} (current score: ${currentScore}/10).
+Return ONLY valid JSON, no markdown:
+{"score": <number 1-10>, "critique": "<one paragraph>", "weaknesses": ["<issue1>", "<issue2>", "<issue3>"]}
+
+Code to critique:
+\`\`\`javascript
+${currentCode.slice(0, 900)}
+\`\`\``;
+
+      let critique = 'improve error handling, add documentation, clarify naming';
+      let scoreBefore = currentScore;
+      try {
+        const res = await ollamaChat(modelA, SYS_A(), [{ role: 'user', content: critiquePrompt }],
+          parseFloat(document.getElementById('ac-a-temp').value) || 0.3, 1024);
+        const jsonStr = res.match(/\{[\s\S]*?\}/)?.[0];
+        if (jsonStr) {
+          const j = JSON.parse(jsonStr);
+          currentScore = typeof j.score === 'number' ? j.score : currentScore;
+          critique = [j.critique, ...(j.weaknesses || [])].filter(Boolean).join(' | ');
+        }
+      } catch (e) {
+        // fallback: keep existing score
+      }
+
+      if (progressCb) progressCb(item, iter * 2 + 1, maxIterations * 2);
+
+      // ── Agent B: Refine using critique ──
+      const refinePrompt = `Refine this ${item.kind} addressing ALL of the following issues:
+${critique}
+
+Current code (score: ${currentScore}/10):
+\`\`\`javascript
+${currentCode.slice(0, 900)}
+\`\`\`
+
+Return ONLY the improved implementation in a single fenced javascript block. No explanation outside the block.`;
+
+      let refinedCode = currentCode;
+      try {
+        const res = await ollamaChat(modelB, SYS_B(), [{ role: 'user', content: refinePrompt }],
+          parseFloat(document.getElementById('ac-b-temp').value) || 0.65, 2048);
+        const match = res.match(/```(?:javascript|js)?\n?([\s\S]*?)```/i);
+        if (match && match[1].trim().length > 20) refinedCode = match[1].trim();
+      } catch {}
+
+      // ── Agent A: Re-score ──
+      let scoreAfter = currentScore;
+      const rescorePrompt = `Score this refined ${item.kind} 1-10. Return ONLY valid JSON:
+{"score": <number>, "improvement": "<one sentence>"}
+
+\`\`\`javascript
+${refinedCode.slice(0, 600)}
+\`\`\``;
+      try {
+        const res = await ollamaChat(modelA, SYS_A(), [{ role: 'user', content: rescorePrompt }],
+          0.2, 256);
+        const jsonStr = res.match(/\{[\s\S]*?\}/)?.[0];
+        if (jsonStr) {
+          const j = JSON.parse(jsonStr);
+          scoreAfter = typeof j.score === 'number' ? j.score : currentScore;
+        }
+      } catch {}
+
+      const delta = scoreAfter - scoreBefore;
+      logEntry.iters.push({ iter: iter + 1, scoreBefore, scoreAfter, delta, critique, converged: scoreAfter >= threshold });
+      currentCode = refinedCode;
+      currentScore = scoreAfter;
+
+      if (scoreAfter >= threshold) { converged = true; break; }
+    }
+
+    // Commit results back to item
+    item.refinedCode = currentCode;
+    item.refined = true;
+    item.innovation = currentScore;
+    item.converged = converged;
+    item.iterCount = logEntry.iters.length;
+    const lastIter = logEntry.iters[logEntry.iters.length - 1];
+    const totalDelta = lastIter ? lastIter.scoreAfter - (logEntry.iters[0]?.scoreBefore ?? item.innovation) : 0;
+    item.desc = `[iter×${logEntry.iters.length}${converged ? ' ✓converged' : ''}, score: ${currentScore}/10, Δ${totalDelta >= 0 ? '+' : ''}${totalDelta}]`;
+
+    // Store log
+    const existing = iterationLog.findIndex(x => x.id === item.id);
+    if (existing >= 0) iterationLog[existing] = logEntry;
+    else iterationLog.push(logEntry);
+  }
+}
+
+// ═══ AI SCORE ALL ═══
+async function aiScoreItems(items, model) {
+  const prompt = `Score each of these ${items.length} code items for innovation (1-10). Return ONLY a JSON array, no markdown:
+[{"name": "functionName", "score": 7, "desc": "one sentence what it does"}]
+
+Items:
+${items.map(x => `${x.name} [${x.kind}] from ${x.file}:\n${x.code.slice(0,200)}`).join('\n---\n')}`;
+
+  try {
+    const res = await ollamaChat(model, SYS_A(), [{ role: 'user', content: prompt }], 0.3, 4096);
+    const jsonMatch = res.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const scores = JSON.parse(jsonMatch[0]);
+      for (const s of scores) {
+        const item = extracted.find(x => x.name === s.name || normName(x.name) === normName(s.name || ''));
+        if (item) { item.innovation = s.score; if (s.desc) item.desc = s.desc; }
+      }
+    }
+  } catch {
+    items.forEach(item => { if (item.innovation === null) item.innovation = item.kind === 'pattern' ? 8 : 3; });
+  }
+}
+
+async function aiScoreAll() {
+  const model = getModelA();
+  if (!model) { toast('Select Agent A model'); return; }
+  if (!extracted.length) { toast('Extract items first'); return; }
+  const unscored = extracted.filter(x => x.innovation === null);
+  if (!unscored.length) { toast('All items already scored'); return; }
+  toast(`Scoring ${unscored.length} items with Agent A…`);
+  setStatus('ld', 'Scoring…');
+  await aiScoreItems(unscored.slice(0, 40), model);
+  setStatus('on', 'Done');
+  renderExtracted();
+  toast('Scoring complete');
+}
+
+async function ollamaChat(model, systemPrompt, messages, temperature = 0.6, maxTokens = 4096) {
+  const msgs = systemPrompt ? [{ role: 'system', content: systemPrompt }, ...messages] : messages;
+  const res = await fetch(`${OLLAMA}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, messages: msgs, stream: false, options: { temperature, num_predict: maxTokens } })
+  });
+  if (!res.ok) throw new Error(`Ollama ${res.status}`);
+  const d = await res.json();
+  return d.message?.content || '';
+}
+
+// ═══ PARSE FILE ═══
+function parseFile(f) {
+  const items = [];
+  const src = f.content;
+  const name = f.name;
+
+  const fnDecl = /^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^)]*)\)\s*\{/gm;
+  const arrowFn = /^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:async\s+)?\(([^)]*)\)\s*=>/gm;
+  const classDef = /^(?:export\s+)?class\s+([A-Za-z_$][A-Za-z0-9_$]*)(?:\s+extends\s+[A-Za-z_$][A-Za-z0-9_.]*)?/gm;
+  const constDef = /^(?:export\s+)?(?:const|let)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?!\()/gm;
+
+  for (const m of [...src.matchAll(fnDecl)]) {
+    const code = extractBlock(src, m.index);
+    if (code && code.length > 30)
+      items.push(mkItem('function', m[1], code, name));
+  }
+  for (const m of [...src.matchAll(arrowFn)]) {
+    const code = extractArrow(src, m.index);
+    if (code && code.length > 30 && !items.find(x => x.name === m[1]))
+      items.push(mkItem('function', m[1], code, name));
+  }
+  for (const m of [...src.matchAll(classDef)]) {
+    const code = extractBlock(src, m.index);
+    if (code && code.length > 40)
+      items.push(mkItem('class', m[1], code, name));
+  }
+  for (const m of [...src.matchAll(constDef)]) {
+    if (/^[A-Z_]{4,}$/.test(m[1])) {
+      const code = extractLine(src, m.index);
+      if (code && code.length > 20)
+        items.push(mkItem('const', m[1], code, name));
+    }
+  }
+  items.push(...detectPatterns(src, name));
+  return items;
+}
+
+function mkItem(kind, name, code, file) {
+  return { id: uid(), kind, name, code, file, lines: code.split('\n').length, innovation: null, desc: '', inLib: false, refined: false, refinedCode: null, converged: false, iterCount: 0, envelope: null };
+}
+
+function extractBlock(src, startIdx) {
+  let braceStart = src.indexOf('{', startIdx);
+  if (braceStart === -1) return null;
+  let depth = 0, i = braceStart;
+  while (i < src.length) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) return src.slice(startIdx, i + 1); }
+    i++;
+  }
+  return src.slice(startIdx, Math.min(startIdx + 2000, src.length));
+}
+
+function extractArrow(src, startIdx) {
+  let arrowIdx = src.indexOf('=>', startIdx);
+  if (arrowIdx === -1) return src.slice(startIdx, startIdx + 500);
+  const afterArrow = src.slice(arrowIdx + 2).trimStart();
+  if (afterArrow[0] === '{') return extractBlock(src, arrowIdx + 2 + (src.slice(arrowIdx + 2).length - afterArrow.length));
+  const endLine = src.indexOf('\n', arrowIdx + 2);
+  return src.slice(startIdx, endLine === -1 ? startIdx + 300 : endLine);
+}
+
+function extractLine(src, startIdx) {
+  const end = src.indexOf('\n', startIdx);
+  const line = end === -1 ? src.slice(startIdx) : src.slice(startIdx, end);
+  if (line.includes('{') && !line.includes('}')) return extractBlock(src, startIdx);
+  return line;
+}
+
+function detectPatterns(src, fname) {
+  const patterns = [];
+  const checks = [
+    { re: /RTCPeerConnection|RTCDataChannel|createOffer|createAnswer/g, name: 'WebRTC Peer', score: 8 },
+    { re: /BroadcastChannel|postMessage.*channel/g, name: 'BroadcastChannel Signaling', score: 7 },
+    { re: /ed25519|nacl\.sign|SignKeyPair|crypto\.subtle.*sign/gi, name: 'Ed25519 Crypto', score: 9 },
+    { re: /gossip|propagate.*peers|flood.*mesh/gi, name: 'Gossip Protocol', score: 9 },
+    { re: /did:[\w]+:|DID.*Document|resolveDID/gi, name: 'DID Identity', score: 9 },
+    { re: /lamport.*clock|vectorClock|happensBefore/gi, name: 'Lamport Clock', score: 8 },
+    { re: /shamir|secretShare|splitSecret|combineShares/gi, name: 'Shamir Secret Sharing', score: 9 },
+    { re: /SEM.?Omega|temporal.*decay|trustDecay/gi, name: 'SEM-Ω Trust Decay', score: 10 },
+    { re: /hashChain|appendEntry.*hash|prevHash.*sha/gi, name: 'Hash-Chain Ledger', score: 8 },
+    { re: /raft|becomeLeader|requestVote|appendEntries/gi, name: 'Raft Consensus', score: 8 },
+    { re: /tokenBucket|rateLimiter|stake.*bond|slash.*stake/gi, name: 'Token Economics', score: 7 },
+    { re: /UEMR|SovereignMesh|sovereign.*protocol/gi, name: 'Sovereign Protocol', score: 10 },
+    { re: /merkle.*tree|merkleRoot|proofOfInclusion/gi, name: 'Merkle Tree', score: 8 },
+  ];
+  for (const c of checks) {
+    const matches = [...src.matchAll(c.re)];
+    if (matches.length > 0) {
+      const idx = matches[0].index;
+      const snippet = src.slice(Math.max(0, idx - 100), Math.min(src.length, idx + 400));
+      patterns.push(mkItem('pattern', c.name + ' [' + fname + ']', snippet, fname));
+      patterns[patterns.length - 1].innovation = c.score;
+      patterns[patterns.length - 1].desc = `Detected ${matches.length} usage(s) of ${c.name}`;
+    }
+  }
+  return patterns;
+}
+
+// ═══ PIPELINE STEP UI ═══
+function setPipeStep(step, state) {
+  const el = document.getElementById('ps-' + step);
+  if (!el) return;
+  el.className = 'pipe-step' + (state === 'active' ? ' active-step' : state === 'done' ? ' done-step' : '');
+}
+
+function toggleStep(btn) {
+  const step = btn.closest('.flow-step').dataset.step;
+  pipelineSteps[step] = !pipelineSteps[step];
+  btn.textContent = pipelineSteps[step] ? '✓' : '○';
+  btn.closest('.flow-step').classList.toggle('enabled', pipelineSteps[step]);
+}
+
+function showLoopIndicator(on) {
+  const el = document.getElementById('pipe-loop-ind');
+  if (el) el.style.display = on ? 'inline-flex' : 'none';
+}
+
+// ═══ RENDER EXTRACTED ═══
+function renderExtracted() {
+  const list = document.getElementById('extract-list');
+  const q = document.getElementById('search-inp').value.toLowerCase();
+  let items = extracted;
+  if (activeFilter !== 'all') items = items.filter(x => x.kind === activeFilter);
+  if (q) items = items.filter(x => x.name.toLowerCase().includes(q) || x.file.toLowerCase().includes(q) || (x.desc && x.desc.toLowerCase().includes(q)));
+  document.getElementById('badge-extract').textContent = extracted.length;
+
+  if (!items.length) {
+    list.innerHTML = `<div style="padding:28px;text-align:center;color:var(--txt2);font-size:13px;font-weight:600">${extracted.length ? 'No items match filter.' : 'No items extracted yet.'}</div>`;
+    return;
+  }
+
+  list.innerHTML = items.map(item => {
+    const log = iterationLog.find(x => x.id === item.id);
+    const firstScore = log?.iters[0]?.scoreBefore;
+    const lastScore = item.innovation;
+    const delta = (log && firstScore != null) ? lastScore - firstScore : null;
+
+    return `
+    <div class="extract-item ${item.inLib ? 'in-lib' : ''} ${isDuplicate(item) ? 'duplicate' : ''}" id="ei-${item.id}">
+      <div class="ei-header" onclick="toggleEI('${item.id}')">
+        <span class="ei-kind ki-${item.kind}">${item.kind}</span>
+        <span class="ei-name">${escH(item.name)}${item.refined ? ` <span style="font-size:9px;color:var(--gold);font-weight:700">★iter×${item.iterCount}</span>` : ''}${item.converged ? ' <span style="font-size:9px;color:var(--green);font-weight:700">✓</span>' : ''}</span>
+        <span class="ei-file">${escH(item.file)}</span>
+        <span class="ei-lines">${item.lines}L</span>
+        ${item.innovation !== null ? `<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:${innovColor(item.innovation)};color:#000;font-weight:700">${item.innovation}</span>` : ''}
+        ${delta !== null ? `<span class="iter-delta ${delta > 0 ? 'pos' : delta < 0 ? 'neg' : 'zero'}">Δ${delta >= 0 ? '+' : ''}${delta}</span>` : ''}
+        <div class="ei-actions" onclick="event.stopPropagation()">
+          <button class="ei-btn ai" onclick="aiAnalyzeItem('${item.id}')">AI↗</button>
+          <button class="ei-btn ${item.inLib ? 'added' : ''}" onclick="toggleLib('${item.id}')">${item.inLib ? '✓ In Lib' : '+ Lib'}</button>
+        </div>
+      </div>
+      <div class="ei-body" id="eib-${item.id}">
+        <div class="ei-code">${escH(item.refinedCode || item.code)}</div>
+        ${item.desc ? `<div class="ei-desc">${escH(item.desc)}</div>` : ''}
+        ${log && log.iters.length ? `
+          <div class="iter-trail">
+            ${log.iters.map(it => `
+              <span class="iter-chip ${it.converged ? 'converged' : ''}">
+                iter ${it.iter}: ${it.scoreBefore}→${it.scoreAfter} (${it.delta >= 0 ? '+' : ''}${it.delta})${it.converged ? ' ✓' : ''}
+              </span>`).join('')}
+          </div>` : ''}
+        ${item.refinedCode && item.refinedCode !== item.code ? `<div style="margin-top:8px"><span style="font-size:10px;font-weight:700;color:var(--txt3)">Original:</span><div class="ei-code" style="margin-top:5px;opacity:.7">${escH(item.code)}</div></div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  updateStats();
+}
+
+function toggleEI(id) {
+  const body = document.getElementById('eib-' + id);
+  if (body) body.classList.toggle('open');
+}
+
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderExtracted();
+}
+
+function filterItems() { renderExtracted(); }
+
+function isDuplicate(item) {
+  return extracted.filter(x => x.id !== item.id && normName(x.name) === normName(item.name)).length > 0;
+}
+
+function normName(n) { return n.toLowerCase().replace(/[-_\s]/g,'').replace(/\[.*\]$/,''); }
+
+function innovColor(n) {
+  if (n >= 8) return '#20e87a';
+  if (n >= 5) return '#ffaa20';
+  return '#445566';
+}
+
+// ═══ ITERATION LOG PANEL ═══
+function renderIterLog() {
+  const list = document.getElementById('iter-log');
+  if (!iterationLog.length) {
+    list.innerHTML = '<div class="ile-empty">Iteration log appears here after pipeline runs with iterative refinement.</div>';
+    return;
+  }
+  list.innerHTML = iterationLog.map(entry => {
+    const item = extracted.find(x => x.id === entry.id);
+    const finalScore = item?.innovation ?? entry.iters[entry.iters.length-1]?.scoreAfter ?? '?';
+    const firstScore = entry.iters[0]?.scoreBefore ?? '?';
+    const totalDelta = (typeof finalScore === 'number' && typeof firstScore === 'number') ? finalScore - firstScore : 0;
+    return `
+    <div class="iter-log-entry">
+      <div class="ile-header" onclick="this.nextElementSibling.classList.toggle('open')">
+        <span class="ile-name">${escH(entry.name)}</span>
+        <span class="ile-iters">×${entry.iters.length}</span>
+        <span class="ile-score" style="color:${innovColor(finalScore)}">${firstScore}→${finalScore} <span class="iter-delta ${totalDelta>0?'pos':totalDelta<0?'neg':'zero'}">(${totalDelta>=0?'+':''}${totalDelta})</span></span>
+      </div>
+      <div class="ile-body">
+        ${entry.iters.map(it => `
+          <div class="ile-iter-row">
+            <strong style="color:${it.converged ? 'var(--green)' : 'var(--purple)'}">iter ${it.iter}${it.converged ? ' ✓ converged' : ''}</strong>
+            · score ${it.scoreBefore} → ${it.scoreAfter} (${it.delta>=0?'+':''}${it.delta})
+            ${it.critique ? `<div class="ile-critique">${escH(it.critique.slice(0,200))}${it.critique.length > 200 ? '…' : ''}</div>` : ''}
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function clearIterLog() {
+  iterationLog = [];
+  renderIterLog();
+  toast('Iteration log cleared');
+}
+
+// ═══ LIBRARY ═══
+function toggleLib(id) {
+  const item = extracted.find(x => x.id === id);
+  if (!item) return;
+  item.inLib = !item.inLib;
+  if (item.inLib) { if (!library.find(x => x.id === id)) library.push(item); }
+  else library = library.filter(x => x.id !== id);
+  renderExtracted(); renderLibrary(); updateStats();
+}
+
+function addAllToLib() {
+  const q = document.getElementById('search-inp').value.toLowerCase();
+  let items = extracted;
+  if (activeFilter !== 'all') items = items.filter(x => x.kind === activeFilter);
+  if (q) items = items.filter(x => x.name.toLowerCase().includes(q) || x.file.toLowerCase().includes(q));
+  items.forEach(item => { item.inLib = true; if (!library.find(x => x.id === item.id)) library.push(item); });
+  renderExtracted(); renderLibrary(); updateStats();
+  toast(`${items.length} items added to library`);
+}
+
+function renderLibrary() {
+  const list = document.getElementById('lib-list');
+  document.getElementById('badge-lib').textContent = library.length;
+  if (!library.length) { list.innerHTML = '<div class="lib-empty">Library is empty.<br>Add items from the Extract tab.</div>'; return; }
+  list.innerHTML = library.map(item => `
+    <div class="lib-entry">
+      <span class="ei-kind ki-${item.kind}" style="font-size:9px;padding:3px 8px;border-radius:10px">${item.kind}</span>
+      <span class="lib-entry-name">${escH(item.name)}</span>
+      ${item.innovation !== null ? `<span style="font-size:11px;font-weight:700;color:${innovColor(item.innovation)}">${item.innovation}/10</span>` : ''}
+      ${item.iterCount ? `<span style="font-size:10px;color:var(--purple);font-weight:700">×${item.iterCount}</span>` : ''}
+      <span class="lib-entry-meta">${escH(item.file)} · ${item.lines}L</span>
+      <button class="lib-entry-remove" onclick="removeFromLib('${item.id}')">×</button>
+    </div>`).join('');
+  updateStats(); updateExportPreview();
+}
+
+function removeFromLib(id) {
+  const item = extracted.find(x => x.id === id);
+  if (item) item.inLib = false;
+  library = library.filter(x => x.id !== id);
+  renderExtracted(); renderLibrary(); updateStats();
+}
+
+function dedupeLib() {
+  const seen = new Map();
+  const deduped = [];
+  for (const item of library) {
+    const key = normName(item.name);
+    if (!seen.has(key)) { seen.set(key, true); deduped.push(item); }
+  }
+  const removed = library.length - deduped.length;
+  library = deduped;
+  extracted.forEach(item => { item.inLib = !!library.find(x => x.id === item.id); });
+  renderLibrary(); renderExtracted(); updateStats();
+  toast(`Removed ${removed} duplicate(s)`);
+}
+
+// ═══ DUPLICATE DETECTION ═══
+function detectDupes() {
+  const groups = new Map();
+  for (const item of extracted) {
+    const key = normName(item.name);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  const dups = [...groups.values()].filter(g => g.length > 1);
+  document.getElementById('stat-dups').textContent = dups.length;
+  renderDupes(dups);
+  return dups;
+}
+
+function renderDupes(dups) {
+  const list = document.getElementById('dup-list');
+  if (!dups || !dups.length) { list.innerHTML = '<div class="dup-empty">No duplicates detected.</div>'; return; }
+  list.innerHTML = dups.map(g => `
+    <div class="dup-group">
+      <div class="dup-group-header" onclick="this.nextElementSibling.classList.toggle('open')">
+        <span class="dup-badge">${g.length}×</span>
+        <span class="dup-group-name">${escH(normName(g[0].name))}</span>
+      </div>
+      <div class="dup-items">
+        ${g.map(item => `
+          <div class="dup-item">
+            <span class="dup-item-file">${escH(item.file)}</span>
+            <span style="font-size:10px;font-weight:700;color:var(--txt3)">${item.lines}L · ${item.innovation ?? '?'}/10</span>
+            <button class="dup-item-keep" onclick="keepFromDup('${item.id}','${g.map(x=>x.id).join(',')}')">Keep</button>
+            <button class="dup-item-drop" onclick="dropFromLib('${item.id}')">Drop</button>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function keepFromDup(keepId, allIds) {
+  allIds.split(',').forEach(id => {
+    if (id !== keepId) {
+      const item = extracted.find(x => x.id === id);
+      if (item) { item.inLib = false; library = library.filter(x => x.id !== id); }
+    }
+  });
+  const kept = extracted.find(x => x.id === keepId);
+  if (kept) { kept.inLib = true; if (!library.find(x => x.id === keepId)) library.push(kept); }
+  renderLibrary(); renderExtracted(); detectDupes(); updateStats();
+  toast('Kept best, dropped duplicates');
+}
+
+function dropFromLib(id) {
+  const item = extracted.find(x => x.id === id);
+  if (item) item.inLib = false;
+  library = library.filter(x => x.id !== id);
+  renderLibrary(); renderExtracted(); detectDupes(); updateStats();
+}
+
+// ═══ AI FEATURES ═══
+async function aiAnalyzeItem(id) {
+  const item = extracted.find(x => x.id === id);
+  if (!item) return;
+  switchCenter('chat');
+  const prompt = `Analyze this extracted ${item.kind} from "${item.file}":\n\n\`\`\`javascript\n${item.code}\n\`\`\`\n\nProvide:\n1. Innovation score (1-10) with explanation\n2. What it does in 1-2 sentences\n3. Specific weaknesses to address\n4. Refined/improved version`;
+  await streamChat(prompt, true, activeAgent === 'b' ? getModelB() : getModelA(), activeAgent === 'b' ? SYS_B() : SYS_A());
+}
+
+async function aiRefinLib() {
+  if (!library.length) { toast('Library is empty'); return; }
+  switchCenter('chat');
+  const prompt = `I have ${library.length} items in my library:\n\n${library.map(x => `- [${x.kind}] ${x.name} (${x.file}, score: ${x.innovation ?? '?'}/10, iters: ${x.iterCount || 0})`).join('\n')}\n\nPlease:\n1. Identify groups of similar functions that could be merged\n2. Suggest which are redundant\n3. Produce a merged version of the most similar group\n4. Give a final clean list of what should survive`;
+  await streamChat(prompt, false, getModelB(), SYS_B());
+}
+
+// ═══ DUAL AGENT CHAT (iterative) ═══
+async function runDualAgentChat(prompt) {
+  const modelA = getModelA(), modelB = getModelB();
+  if (!modelA || !modelB) { toast('Both Agent A and B models required'); return; }
+  if (isStreaming) return;
+  isStreaming = true;
+  document.getElementById('send-btn').disabled = true;
+  const w = document.getElementById('chat-welcome');
+  if (w) w.style.display = 'none';
+  switchCenter('chat');
+
+  const maxIter = parseInt(document.getElementById('ac-iter-count').value) || 2;
+  const threshold = parseInt(document.getElementById('ac-threshold').value) || 8;
+
+  appendChatMsg('user', prompt);
+
+  let iterCode = prompt;
+  let lastBResponse = '';
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    // Agent A: score + critique
+    const thinkIdA = appendThinking(`⚡ Agent A — critique pass ${iter + 1}/${maxIter}`);
+    let aResponse = '';
+    const aCritiquePrompt = iter === 0
+      ? `[MODE: ${chatMode}]\n${prompt}\n\nReturn a structured critique and score.`
+      : `Re-score and critique this refined version (iteration ${iter + 1}):\n\n${lastBResponse}\n\nOriginal request: ${prompt}\n\nReturn updated score and remaining weaknesses.`;
+
+    try {
+      aResponse = await ollamaChat(modelA, SYS_A(), [{ role: 'user', content: aCritiquePrompt }],
+        parseFloat(document.getElementById('ac-a-temp').value) || 0.3,
+        parseInt(document.getElementById('ac-a-tokens').value) || 4096);
+    } catch (e) { aResponse = `Agent A error: ${e.message}`; }
+    removeThinking(thinkIdA);
+    appendChatMsg('assistant', aResponse, false, `⚡ Agent A — iter ${iter + 1} critique`, false, 'iter-msg');
+
+    // Extract score from A's response
+    const scoreMatch = aResponse.match(/score[:\s]+(\d+)/i) || aResponse.match(/(\d+)\/10/);
+    const currentScore = scoreMatch ? parseInt(scoreMatch[1]) : null;
+
+    if (currentScore !== null && currentScore >= threshold) {
+      appendChatMsg('assistant', `✓ Score ${currentScore}/10 reached threshold ${threshold}. Converged after ${iter + 1} iteration(s).`, false, `⚡ Agent A — converged`, false, 'iter-msg');
+      break;
+    }
+
+    // Agent B: refine using critique
+    const thinkIdB = appendThinking(`★ Agent B — refine pass ${iter + 1}/${maxIter}`);
+    const handoff = document.getElementById('ac-b-handoff').checked;
+    const bInput = handoff
+      ? `Agent A critique (iter ${iter + 1}):\n\n${aResponse}\n\nOriginal request: ${prompt}\n\nRefine addressing ALL critique points. Produce improved implementation.`
+      : prompt;
+
+    try {
+      lastBResponse = await ollamaChat(modelB, SYS_B(), [{ role: 'user', content: bInput }],
+        parseFloat(document.getElementById('ac-b-temp').value) || 0.65,
+        parseInt(document.getElementById('ac-b-tokens').value) || 8192);
+    } catch (e) { lastBResponse = `Agent B error: ${e.message}`; }
+    removeThinking(thinkIdB);
+    appendChatMsg('assistant', lastBResponse, false, `★ Agent B — iter ${iter + 1} refinement`, true);
+
+    const codeMatch = lastBResponse.match(/```(?:javascript|js|html)?\n?([\s\S]*?)```/i);
+    if (codeMatch) { lastOutput = codeMatch[1].trim(); document.getElementById('code-out').textContent = lastOutput; switchRight('output'); }
+
+    iterCode = lastBResponse;
+  }
+
+  chatHistory.push({ role: 'user', content: prompt }, { role: 'assistant', content: lastBResponse });
+  isStreaming = false;
+  document.getElementById('send-btn').disabled = false;
+}
+
+// ═══ CHAT ═══
+async function sendChat() {
+  if (isStreaming) return;
+  const inp = document.getElementById('chat-inp');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  const model = activeAgent === 'b' ? getModelB() : getModelA();
+  const sys = activeAgent === 'b' ? SYS_B() : SYS_A();
+  const label = activeAgent === 'b' ? `★ Agent B (${model.split(':')[0]})` : `⚡ Agent A (${model.split(':')[0]})`;
+  await streamChat(text, false, model, sys, label);
+}
+
+async function streamChat(text, skipUserRender = false, model = null, sysPrompt = null, agentLabel = null) {
+  model = model || getModelA();
+  sysPrompt = sysPrompt || SYS_A();
+  if (!model) { toast('Select a model'); return; }
+  isStreaming = true;
+  document.getElementById('send-btn').disabled = true;
+
+  const w = document.getElementById('chat-welcome');
+  if (w) w.style.display = 'none';
+
+  let ctxBlock = '';
+  if (ctx.lib && library.length) ctxBlock += `\n\n<library_context>\n${library.map(x => `[${x.kind}] ${x.name} score:${x.innovation??'?'}/10 iters:${x.iterCount||0}:\n${(x.refinedCode||x.code).slice(0,300)}`).join('\n---\n')}\n</library_context>`;
+  if (ctx.extract && extracted.length) ctxBlock += `\n\n<extracted_context>\n${extracted.slice(0,20).map(x => `[${x.kind}] ${x.name} from ${x.file} (score: ${x.innovation??'?'}/10)`).join('\n')}\n</extracted_context>`;
+  if (ctx.files && files.length) ctxBlock += `\n\n<files_context>\n${files.map(f => `File: ${f.name}\n${f.content.slice(0,400)}`).join('\n---\n')}\n</files_context>`;
+
+  const modePrefix = { refine: '[MODE: Refine and improve]\n', build: '[MODE: Build complete app]\n', analyze: '[MODE: Analyze and assess]\n', merge: '[MODE: Merge into optimal implementation]\n' }[chatMode] || '';
+  const fullMsg = modePrefix + text + ctxBlock;
+
+  if (!skipUserRender) appendChatMsg('user', text);
+  chatHistory.push({ role: 'user', content: fullMsg });
+
+  const thinkId = appendThinking(`${agentLabel || '⚡ Agent A'} thinking…`);
+
+  try {
+    const msgs = [{ role: 'system', content: sysPrompt }, ...chatHistory];
+    const res = await fetch(`${OLLAMA}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, messages: msgs, stream: true, options: { temperature: 0.6, num_predict: 8192 } })
+    });
+    if (!res.ok) throw new Error(`Ollama ${res.status}`);
+    removeThinking(thinkId);
+
+    let full = '';
+    const isB = agentLabel && agentLabel.includes('Agent B');
+    const msgEl = appendChatMsg('assistant', '', true, agentLabel, isB);
+    const bodyEl = msgEl.querySelector('.msg-body');
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const lines = dec.decode(value).split('\n').filter(l => l.trim());
+      for (const line of lines) {
+        try { const j = JSON.parse(line); if (j.message?.content) { full += j.message.content; bodyEl.innerHTML = renderChat(full); scrollChat(); } } catch {}
+      }
+    }
+
+    chatHistory.push({ role: 'assistant', content: full });
+    const codeMatch = full.match(/```(?:javascript|js|html)?\n?([\s\S]*?)```/i);
+    if (codeMatch) { lastOutput = codeMatch[1].trim(); document.getElementById('code-out').textContent = lastOutput; switchRight('output'); }
+
+  } catch (e) {
+    removeThinking(thinkId);
+    appendChatMsg('assistant', `Error: ${e.message}`);
+  }
+
+  isStreaming = false;
+  document.getElementById('send-btn').disabled = false;
+}
+
+function appendChatMsg(role, content, streaming = false, label = null, isAgentB = false, extraClass = '') {
+  const anchor = document.getElementById('scroll-anchor');
+  const div = document.createElement('div');
+  div.className = `msg ${role}${isAgentB ? ' agent-b-msg' : ''}${extraClass ? ' ' + extraClass : ''}`;
+  const roleLabel = role === 'user' ? 'You' : (label || '⚡ Agent A');
+  const roleClass = isAgentB ? 'agent-b' : (extraClass === 'iter-msg' ? 'iter-msg' : role);
+  div.innerHTML = `<div class="msg-role ${roleClass}">${escH(roleLabel)}</div><div class="msg-body">${streaming ? '' : renderChat(content)}</div>`;
+  anchor.parentNode.insertBefore(div, anchor);
+  scrollChat();
+  return div;
+}
+
+let _tc = 0;
+function appendThinking(label = '⚡ Thinking…') {
+  const id = 'tk' + (++_tc);
+  const anchor = document.getElementById('scroll-anchor');
+  const d = document.createElement('div');
+  d.id = id; d.className = 'think-ind';
+  d.innerHTML = `<div class="dots"><span></span><span></span><span></span></div> ${escH(label)}`;
+  anchor.parentNode.insertBefore(d, anchor);
+  scrollChat();
+  return id;
+}
+function removeThinking(id) { const e = document.getElementById(id); if (e) e.remove(); }
+function scrollChat() { document.getElementById('scroll-anchor').scrollIntoView({ behavior: 'smooth' }); }
+
+function renderChat(text) {
+  let h = escH(text);
+  h = h.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    const raw = unescH(code);
+    return `<div class="cb-wrap"><div class="cb-head"><span>${lang||'code'}</span><button class="cb-copy" onclick="copyCB(this)">Copy</button></div><div class="cb-body">${escH(raw)}</div></div>`;
+  });
+  h = h.replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--txt)">$1</strong>');
+  h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
+  h = h.replace(/^[•\-] (.+)$/gm, '<span style="display:block;padding-left:12px;margin:3px 0">· $1</span>');
+  return h;
+}
+
+function copyCB(btn) {
+  navigator.clipboard.writeText(btn.closest('.cb-wrap').querySelector('.cb-body').textContent)
+    .then(() => { btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = 'Copy', 1500); });
+}
+
+function quickChat(text) { document.getElementById('chat-inp').value = text; sendChat(); }
+
+// ═══ CONTEXT ═══
+function addLibCtx() { ctx.lib = true; updateCtxChips(); }
+function addExtractCtx() { ctx.extract = true; updateCtxChips(); }
+function addFilesCtx() { ctx.files = true; updateCtxChips(); }
+function toggleCtx(k) { ctx[k] = false; updateCtxChips(); }
+function updateCtxChips() {
+  document.getElementById('ctx-lib-chip').style.display = ctx.lib ? '' : 'none';
+  document.getElementById('ctx-extract-chip').style.display = ctx.extract ? '' : 'none';
+  document.getElementById('ctx-files-chip').style.display = ctx.files ? '' : 'none';
+}
+
+function setMode(m) {
+  chatMode = m;
+  document.querySelectorAll('.mode-btn[id^="mb-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('mb-' + m)?.classList.add('active');
+}
+
+function setAgent(a) {
+  activeAgent = a;
+  document.getElementById('ag-a').classList.toggle('active', a === 'a');
+  document.getElementById('ag-b').classList.toggle('active', a === 'b');
+}
+
+// ═══ EXPORT ═══
+function exportLib(format) {
+  if (!library.length) { toast('Library is empty'); return; }
+  const ns = document.getElementById('opt-ns').value || 'SovereignLib';
+  const jsdoc = document.getElementById('opt-jsdoc').checked;
+  const minify = document.getElementById('opt-minify').checked;
+  let output = '';
+
+  if (format === 'esm') {
+    output = `// ${ns} — ES Module Export\n// Generated: ${new Date().toISOString()}\n// Items: ${library.length}\n\n`;
+    output += library.map(item => {
+      const code = item.refinedCode || item.code;
+      const doc = jsdoc ? `/**\n * ${item.desc || item.name}\n * @source ${item.file}\n * @innovation ${item.innovation ?? 'unrated'}/10\n * @iterations ${item.iterCount || 0}\n * @converged ${item.converged || false}\n */\n` : '';
+      return doc + (code.startsWith('export') ? code : `export ${code}`);
+    }).join('\n\n');
+  } else if (format === 'cjs') {
+    output = `// ${ns} — CommonJS\n// Generated: ${new Date().toISOString()}\n\n`;
+    output += library.map(item => item.refinedCode || item.code).join('\n\n');
+    output += `\n\nmodule.exports = { ${library.map(x => x.name.split(' ')[0]).join(', ')} };\n`;
+  } else if (format === 'html') {
+    output = `<!DOCTYPE html>\n<html><head><meta charset="UTF-8"><title>${ns}</title></head><body>\n<script>\n`;
+    output += library.map(item => item.refinedCode || item.code).join('\n\n');
+    output += `\n<\/script>\n</body></html>`;
+  } else if (format === 'json') {
+    output = JSON.stringify({ name: ns, generated: new Date().toISOString(), count: library.length,
+      items: library.map(x => ({ name: x.name, kind: x.kind, file: x.file, lines: x.lines, innovation: x.innovation, desc: x.desc, refined: x.refined, iterCount: x.iterCount, converged: x.converged })) }, null, 2);
+  } else if (format === 'md') {
+    output = `# ${ns} — Function Reference\n\nGenerated: ${new Date().toISOString()}  \nItems: ${library.length}\n\n---\n\n`;
+    output += library.map(item => `## \`${item.name}\`\n\n**Kind:** ${item.kind}  \n**Source:** \`${item.file}\`  \n**Innovation:** ${item.innovation ?? 'unrated'}/10  \n**Refined Iterations:** ${item.iterCount || 0}  \n**Converged:** ${item.converged ? 'Yes ✓' : 'No'}\n\n${item.desc || ''}\n\n\`\`\`javascript\n${item.refinedCode || item.code}\n\`\`\`\n`).join('\n---\n\n');
+  } else if (format === 'bundle') {
+    output = `(function(global){\n  'use strict';\n  var ${ns} = {};\n\n`;
+    output += library.map(item => `  // ${item.name} [score:${item.innovation??'?'}/10, iters:${item.iterCount||0}]\n  ${(item.refinedCode || item.code).replace(/^export\s+/, '')}`).join('\n\n');
+    output += `\n\n  global.${ns} = ${ns};\n})(typeof window !== 'undefined' ? window : global);\n`;
+  }
+
+  if (minify) output = output.replace(/\n\s*/g, ' ').replace(/\s{2,}/g, ' ');
+  lastOutput = output;
+  document.getElementById('code-out').textContent = output;
+  document.getElementById('exp-preview').textContent = output.slice(0, 800) + (output.length > 800 ? '\n…' : '');
+  switchRight('output');
+  const exts = { esm:'js', cjs:'js', html:'html', json:'json', md:'md', bundle:'js' };
+  downloadStr(output, `${ns}.${exts[format]}`);
+  toast(`Exported as .${exts[format]}`);
+}
+
+function updateExportPreview() {
+  if (!library.length) return;
+  document.getElementById('exp-preview').textContent = `// ${library.length} items in library\n` + library.map(x => `// [${x.kind}] ${x.name} score:${x.innovation??'?'}/10 iters:${x.iterCount||0}${x.converged?' ✓':''}`).join('\n');
+}
+
+// ═══ OUTPUT ═══
+function copyOutput() { if (!lastOutput) { toast('Nothing to copy'); return; } navigator.clipboard.writeText(lastOutput).then(() => toast('Copied!')); }
+function downloadOutput(ext = 'js') { if (!lastOutput) { toast('Nothing to download'); return; } downloadStr(lastOutput, `output-${Date.now()}.${ext}`); }
+function addOutputToLib() {
+  if (!lastOutput) { toast('Nothing to add'); return; }
+  const item = mkItem('function', 'ai-gen-' + Date.now().toString(36), lastOutput, 'ai-output');
+  item.refinedCode = lastOutput;
+  item.refined = true;
+  item.inLib = true;
+  item.desc = 'Generated by AI pipeline';
+  extracted.push(item); library.push(item);
+  renderExtracted(); renderLibrary(); updateStats(); toast('Added to library');
+}
+
+// ═══ NAV ═══
+function switchCenter(tab) {
+  ['extract','library','chat'].forEach(t => {
+    document.getElementById('cp-'+t).classList.toggle('active', t===tab);
+    document.getElementById('sn-'+t).classList.toggle('active', t===tab);
+  });
+}
+function switchRight(tab) {
+  ['output','agents','iterlog','dupes','export'].forEach(t => {
+    document.getElementById('rp-'+t).classList.toggle('active', t===tab);
+    document.getElementById('rt-'+t).classList.toggle('active', t===tab);
+  });
+}
+
+// ═══ STATS ═══
+function updateStats() {
+  document.getElementById('stat-files').textContent = files.length;
+  document.getElementById('stat-funcs').textContent = extracted.length;
+  document.getElementById('stat-lib').textContent = library.length;
+  document.getElementById('badge-extract').textContent = extracted.length;
+  document.getElementById('badge-lib').textContent = library.length;
+}
+
+// ═══ PROGRESS ═══
+function showProgress() { document.getElementById('progress-overlay').classList.add('active'); }
+function hideProgress() { document.getElementById('progress-overlay').classList.remove('active'); }
+function setProgress(pct, sub, detail, agentLabel = '', iterLabel = '') {
+  document.getElementById('prog-bar').style.width = (pct * 100) + '%';
+  document.getElementById('prog-sub').textContent = sub;
+  document.getElementById('prog-detail').textContent = detail;
+  document.getElementById('prog-agent').textContent = agentLabel;
+  document.getElementById('prog-iter').textContent = iterLabel;
+}
+
+// ═══ UTILS ═══
+function uid() { return Math.random().toString(36).slice(2, 9); }
+function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function unescH(s) { return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"'); }
+function fmtBytes(b) { return b < 1024 ? b+'B' : b < 1048576 ? (b/1024).toFixed(1)+'KB' : (b/1048576).toFixed(1)+'MB'; }
+function fileIcon(ext) { return {js:'📜',ts:'📘',jsx:'⚛️',tsx:'⚛️',html:'🌐',py:'🐍',vue:'💚',css:'🎨',json:'📋',md:'📝'}[ext]||'📄'; }
+function downloadStr(str, fname) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([str],{type:'text/plain'}));
+  a.download = fname; a.click();
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
